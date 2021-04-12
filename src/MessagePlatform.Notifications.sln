@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessagePlatform.Notifications.Core", "MessagePlatform.Notifications.Core\MessagePlatform.Notifications.Core.csproj", "{0783A92B-F877-4DF8-8056-1548F5E051EF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessagePlatform.Notifications.Tests", "MessagePlatform.Notifications.Tests\MessagePlatform.Notifications.Tests.csproj", "{04F9BC3C-98D1-4D3A-B403-4ECA28E8E888}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessagePlatform.Notifications.Functions", "MessagePlatform.Notifications.Functions\MessagePlatform.Notifications.Functions.csproj", "{A8227E79-EF52-4259-84E3-6454D8E58B36}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0783A92B-F877-4DF8-8056-1548F5E051EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0783A92B-F877-4DF8-8056-1548F5E051EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0783A92B-F877-4DF8-8056-1548F5E051EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0783A92B-F877-4DF8-8056-1548F5E051EF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04F9BC3C-98D1-4D3A-B403-4ECA28E8E888}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04F9BC3C-98D1-4D3A-B403-4ECA28E8E888}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04F9BC3C-98D1-4D3A-B403-4ECA28E8E888}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04F9BC3C-98D1-4D3A-B403-4ECA28E8E888}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8227E79-EF52-4259-84E3-6454D8E58B36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8227E79-EF52-4259-84E3-6454D8E58B36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8227E79-EF52-4259-84E3-6454D8E58B36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8227E79-EF52-4259-84E3-6454D8E58B36}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

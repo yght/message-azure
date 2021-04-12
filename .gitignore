@@ -1,0 +1,14 @@
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+coverage*.xml
+*.trx
+local.settings.json
+.azure/
+*.zip
+.DS_Store
+.idea/
+.vscode/
+.claude/
