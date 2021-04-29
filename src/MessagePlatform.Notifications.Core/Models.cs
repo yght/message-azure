@@ -47,18 +47,6 @@ namespace MessagePlatform.Notifications.Core
         public ISet<Channel> EnabledChannels { get; set; } =
             new HashSet<Channel> { Channel.Push, Channel.Email };
 
-        /// <summary>
-        /// Local wall-clock hours during which we do not interrupt. Both null
-        /// means the user has not set any.
-        /// </summary>
-        public TimeSpan? QuietHoursStart { get; set; }
-        public TimeSpan? QuietHoursEnd { get; set; }
-
-        /// <summary>
-        /// How many notifications we have already held back for this person in
-        /// the current digest window.
-        /// </summary>
-        public int PendingDigestCount { get; set; }
     }
 
     public enum DecisionReason
@@ -67,8 +55,6 @@ namespace MessagePlatform.Notifications.Core
         SelfMessage,
         ConversationMuted,
         RecipientPresent,
-        QuietHours,
-        DigestThresholdReached,
         NoChannelsEnabled
     }
 
