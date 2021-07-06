@@ -168,6 +168,125 @@ namespace MessagePlatform.Notifications.Tests
             Assert.Equal(DecisionReason.NoChannelsEnabled, decision.Reason);
         }
 
+        // ----------------------------------------------------------- quiet hours
+
+        private static RecipientState Sleeper(Action<RecipientState>? tweak = null)
+        {
+            return Recipient(r =>
+            {
+                r.QuietHoursStart = new TimeSpan(22, 0, 0);
+                r.QuietHoursEnd = new TimeSpan(7, 0, 0);
+                tweak?.Invoke(r);
+            });
+        }
+
+        [Fact]
+        public void DefersInsideQuietHoursThatWrapMidnight()
+        {
+            // 03:00 in Toronto on 15 June is 07:00 UTC.
+            var threeAm = new DateTime(2021, 6, 15, 7, 0, 0, DateTimeKind.Utc);
+            var decision = _policy.Decide(Message(), Sleeper(), threeAm);
+
+            Assert.True(decision.Deferred);
+            Assert.Equal(DecisionReason.QuietHours, decision.Reason);
+            Assert.False(decision.WillSendNow);
+        }
+
+        [Fact]
+        public void DefersUntilQuietHoursEndInTheUsersOwnMorning()
+        {
+            var threeAm = new DateTime(2021, 6, 15, 7, 0, 0, DateTimeKind.Utc);
+            var decision = _policy.Decide(Message(), Sleeper(), threeAm);
+
+            // 07:00 Toronto on the 15th is 11:00 UTC, EDT being UTC-4.
+            Assert.Equal(new DateTime(2021, 6, 15, 11, 0, 0, DateTimeKind.Utc), decision.DeliverAfterUtc);
+        }
+
+        [Fact]
+        public void DefersToTomorrowMorningWhenItIsLateEvening()
+        {
+            // 23:00 Toronto on 15 June is 03:00 UTC on the 16th.
+            var elevenPm = new DateTime(2021, 6, 16, 3, 0, 0, DateTimeKind.Utc);
+            var decision = _policy.Decide(Message(), Sleeper(), elevenPm);
+
+            Assert.True(decision.Deferred);
+            // Still the 16th locally in the morning: 07:00 Toronto = 11:00 UTC.
+            Assert.Equal(new DateTime(2021, 6, 16, 11, 0, 0, DateTimeKind.Utc), decision.DeliverAfterUtc);
+        }
+
+        [Fact]
+        public void SendsOutsideQuietHours()
+        {
+            // Midday Toronto.
+            var decision = _policy.Decide(Message(), Sleeper(), Midday);
+
+            Assert.False(decision.Deferred);
+            Assert.Equal(DecisionReason.Notify, decision.Reason);
+        }
+
+        [Fact]
+        public void UrgentBreaksThroughQuietHours()
+        {
+            var threeAm = new DateTime(2021, 6, 15, 7, 0, 0, DateTimeKind.Utc);
+            var decision = _policy.Decide(Message(urgent: true), Sleeper(), threeAm);
+
+            Assert.True(decision.WillSendNow);
+        }
+
+        [Fact]
+        public void HandlesAQuietWindowThatDoesNotWrapMidnight()
+        {
+            // A day-sleeper: quiet from 09:00 to 17:00 local.
+            var dayShift = Recipient(r =>
+            {
+                r.QuietHoursStart = new TimeSpan(9, 0, 0);
+                r.QuietHoursEnd = new TimeSpan(17, 0, 0);
+            });
+
+            var decision = _policy.Decide(Message(), dayShift, Midday); // midday Toronto
+
+            Assert.True(decision.Deferred);
+            Assert.Equal(new DateTime(2021, 6, 15, 21, 0, 0, DateTimeKind.Utc), decision.DeliverAfterUtc);
+        }
+
+        [Fact]
+        public void RespectsTheUsersZoneRatherThanTheServers()
+        {
+            // 03:00 UTC is 04:00 in London and 23:00 the previous day in
+            // Toronto. Both are inside a 22:00-07:00 window, and a naive UTC
+            // comparison would get one of them wrong.
+            var at3Utc = new DateTime(2021, 6, 15, 3, 0, 0, DateTimeKind.Utc);
+
+            var london = Sleeper(r => r.TimeZoneId = "Europe/London");
+            var toronto = Sleeper();
+
+            Assert.True(_policy.Decide(Message(), london, at3Utc).Deferred);
+            Assert.True(_policy.Decide(Message(), toronto, at3Utc).Deferred);
+        }
+
+        [Fact]
+        public void SendsRatherThanSilencingWhenTheTimeZoneIsUnknown()
+        {
+            // Failing closed here would silence somebody indefinitely because
+            // of a bad string in their profile.
+            var broken = Sleeper(r => r.TimeZoneId = "Mars/Olympus_Mons");
+            var threeAm = new DateTime(2021, 6, 15, 7, 0, 0, DateTimeKind.Utc);
+
+            var decision = _policy.Decide(Message(), broken, threeAm);
+
+            Assert.False(decision.Deferred);
+            Assert.Equal(DecisionReason.Notify, decision.Reason);
+        }
+
+        [Fact]
+        public void IgnoresQuietHoursWhenTheUserHasNotSetThem()
+        {
+            var threeAm = new DateTime(2021, 6, 15, 7, 0, 0, DateTimeKind.Utc);
+            var decision = _policy.Decide(Message(), Recipient(), threeAm);
+
+            Assert.Equal(DecisionReason.Notify, decision.Reason);
+        }
+
         // ------------------------------------------------------------ arguments
 
         [Fact]

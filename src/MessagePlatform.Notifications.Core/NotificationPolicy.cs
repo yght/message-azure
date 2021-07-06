@@ -1,18 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MessagePlatform.Notifications.Core
 {
     /// <summary>
-    /// Decides whether and how to interrupt somebody.
+    /// Decides whether, how and when to interrupt somebody.
     ///
     /// Pure. No Service Bus, no Cosmos, no clock of its own - the current time
     /// is a parameter. Everything that talks to Azure lives in the function
     /// that calls this.
     ///
-    /// The ordering of the rules is the design. Mute beats presence, and an
-    /// "urgent" flag set by another user is not permission to override what
-    /// this user asked for.
+    /// The ordering of the rules is the design. Mute beats presence, presence
+    /// beats quiet hours, and urgency beats quiet hours but never beats mute.
+    /// Somebody who muted a conversation has said what they want and an
+    /// "urgent" flag set by another user is not permission to override it.
     /// </summary>
     public class NotificationPolicy
     {
@@ -55,6 +57,17 @@ namespace MessagePlatform.Notifications.Core
             if (channels.Count == 0)
             {
                 return Drop(DecisionReason.NoChannelsEnabled);
+            }
+
+            if (!message.IsUrgent && IsInQuietHours(recipient, nowUtc, out var quietEndsUtc))
+            {
+                return new NotificationDecision
+                {
+                    Channels = channels,
+                    Deferred = true,
+                    DeliverAfterUtc = quietEndsUtc,
+                    Reason = DecisionReason.QuietHours
+                };
             }
 
             return new NotificationDecision
@@ -119,6 +132,84 @@ namespace MessagePlatform.Notifications.Core
             }
 
             return chosen;
+        }
+
+        /// <summary>
+        /// Quiet hours are wall-clock local, so this converts rather than
+        /// comparing UTC. A window that wraps midnight (22:00 to 07:00) is the
+        /// normal case, not the edge case.
+        /// </summary>
+        internal bool IsInQuietHours(RecipientState recipient, DateTime nowUtc, out DateTime? endsUtc)
+        {
+            endsUtc = null;
+
+            if (recipient.QuietHoursStart == null || recipient.QuietHoursEnd == null)
+            {
+                return false;
+            }
+
+            var zone = ResolveZone(recipient.TimeZoneId);
+            if (zone == null)
+            {
+                // An unknown zone must not silence somebody's notifications
+                // forever. Fail open: send it.
+                return false;
+            }
+
+            var localNow = TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.SpecifyKind(nowUtc, DateTimeKind.Utc), zone);
+
+            var start = recipient.QuietHoursStart.Value;
+            var end = recipient.QuietHoursEnd.Value;
+            var timeOfDay = localNow.TimeOfDay;
+
+            bool inWindow;
+            DateTime localEnd;
+
+            if (start <= end)
+            {
+                inWindow = timeOfDay >= start && timeOfDay < end;
+                localEnd = localNow.Date.Add(end);
+            }
+            else
+            {
+                // Wraps midnight.
+                inWindow = timeOfDay >= start || timeOfDay < end;
+                localEnd = timeOfDay >= start
+                    ? localNow.Date.AddDays(1).Add(end)
+                    : localNow.Date.Add(end);
+            }
+
+            if (!inWindow)
+            {
+                return false;
+            }
+
+            endsUtc = TimeZoneInfo.ConvertTimeToUtc(
+                DateTime.SpecifyKind(localEnd, DateTimeKind.Unspecified), zone);
+
+            return true;
+        }
+
+        private static TimeZoneInfo ResolveZone(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return null;
+            }
+
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(id);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return null;
+            }
+            catch (InvalidTimeZoneException)
+            {
+                return null;
+            }
         }
     }
 
