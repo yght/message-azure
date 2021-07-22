@@ -287,6 +287,47 @@ namespace MessagePlatform.Notifications.Tests
             Assert.Equal(DecisionReason.Notify, decision.Reason);
         }
 
+        // --------------------------------------------------------------- digest
+
+        [Fact]
+        public void BatchesGroupChatterOnceTheThresholdIsReached()
+        {
+            var busy = Recipient(r => r.PendingDigestCount = 5);
+            var decision = _policy.Decide(Message(group: true), busy, Midday);
+
+            Assert.True(decision.Deferred);
+            Assert.Equal(DecisionReason.DigestThresholdReached, decision.Reason);
+            Assert.Equal(Midday.AddMinutes(15), decision.DeliverAfterUtc);
+        }
+
+        [Fact]
+        public void StillNotifiesBelowTheThreshold()
+        {
+            var busy = Recipient(r => r.PendingDigestCount = 4);
+            var decision = _policy.Decide(Message(group: true), busy, Midday);
+
+            Assert.Equal(DecisionReason.Notify, decision.Reason);
+        }
+
+        [Fact]
+        public void DoesNotBatchDirectMessages()
+        {
+            // A one-to-one message is not chatter, however many are pending.
+            var busy = Recipient(r => r.PendingDigestCount = 50);
+            var decision = _policy.Decide(Message(group: false), busy, Midday);
+
+            Assert.Equal(DecisionReason.Notify, decision.Reason);
+        }
+
+        [Fact]
+        public void DoesNotBatchAnUrgentGroupMessage()
+        {
+            var busy = Recipient(r => r.PendingDigestCount = 50);
+            var decision = _policy.Decide(Message(group: true, urgent: true), busy, Midday);
+
+            Assert.True(decision.WillSendNow);
+        }
+
         // ------------------------------------------------------------ arguments
 
         [Fact]

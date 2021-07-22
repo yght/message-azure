@@ -53,6 +53,12 @@ namespace MessagePlatform.Notifications.Core
         /// </summary>
         public TimeSpan? QuietHoursStart { get; set; }
         public TimeSpan? QuietHoursEnd { get; set; }
+
+        /// <summary>
+        /// How many notifications we have already held back for this person in
+        /// the current digest window.
+        /// </summary>
+        public int PendingDigestCount { get; set; }
     }
 
     public enum DecisionReason
@@ -62,6 +68,7 @@ namespace MessagePlatform.Notifications.Core
         ConversationMuted,
         RecipientPresent,
         QuietHours,
+        DigestThresholdReached,
         NoChannelsEnabled
     }
 

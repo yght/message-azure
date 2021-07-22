@@ -70,6 +70,22 @@ namespace MessagePlatform.Notifications.Core
                 };
             }
 
+            // Group chatter is the main source of notification fatigue. Past
+            // the threshold we stop sending individually and let the digest
+            // pick it up.
+            if (message.IsGroup &&
+                !message.IsUrgent &&
+                recipient.PendingDigestCount >= _options.DigestThreshold)
+            {
+                return new NotificationDecision
+                {
+                    Channels = channels,
+                    Deferred = true,
+                    DeliverAfterUtc = nowUtc.Add(_options.DigestWindow),
+                    Reason = DecisionReason.DigestThresholdReached
+                };
+            }
+
             return new NotificationDecision
             {
                 Channels = channels,
@@ -220,5 +236,9 @@ namespace MessagePlatform.Notifications.Core
         /// The web client heartbeats every 30 seconds, so this is two beats.
         /// </summary>
         public TimeSpan PresenceWindow { get; set; } = TimeSpan.FromSeconds(60);
+
+        public int DigestThreshold { get; set; } = 5;
+
+        public TimeSpan DigestWindow { get; set; } = TimeSpan.FromMinutes(15);
     }
 }
