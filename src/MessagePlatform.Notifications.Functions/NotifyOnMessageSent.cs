@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using MessagePlatform.Notifications.Core;
 using Microsoft.Azure.WebJobs;
+using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -36,6 +37,8 @@ namespace MessagePlatform.Notifications.Functions
             string body,
             string messageId,
             int deliveryCount,
+            [ServiceBus("notifications-deferred", Connection = "ServiceBusConnection")]
+            IAsyncCollector<ServiceBusMessage> deferredQueue,
             ILogger log)
         {
             var evt = JsonConvert.DeserializeObject<MessageEvent>(body);
@@ -66,6 +69,25 @@ namespace MessagePlatform.Notifications.Functions
                 "Message {MessageId} for {UserId}: {Reason}, channels {Channels}, deferred {Deferred}",
                 evt.MessageId, evt.RecipientId, decision.Reason,
                 string.Join(",", decision.Channels), decision.Deferred);
+
+            if (decision.Deferred && decision.DeliverAfterUtc.HasValue)
+            {
+                /*
+                  Re-enqueue with a scheduled delivery time rather than holding
+                  it in memory. A function that keeps state across an
+                  invocation is a function that loses it on the next scale-in.
+                */
+                var deferredMessage = new ServiceBusMessage(body)
+                {
+                    ScheduledEnqueueTime = new DateTimeOffset(decision.DeliverAfterUtc.Value, TimeSpan.Zero),
+                    // Same id, so duplicate detection still catches a double
+                    // publish of the same underlying message.
+                    MessageId = $"{evt.MessageId}:{evt.RecipientId}"
+                };
+
+                await deferredQueue.AddAsync(deferredMessage);
+                return;
+            }
 
             if (!decision.WillSendNow)
             {
