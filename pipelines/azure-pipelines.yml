@@ -1,0 +1,91 @@
+# Build, test, then deploy dev automatically.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+
+variables:
+  buildConfiguration: 'Release'
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildAndTest
+        pool:
+          vmImage: $(vmImage)
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '6.0.x'
+
+          - script: dotnet build src/MessagePlatform.Notifications.sln -c $(buildConfiguration) --warnaserror
+            displayName: 'Build'
+
+          # Warnings are errors here on purpose. A nullable warning that gets
+          # ignored for six months is a null reference in production.
+
+          - script: >
+              dotnet test src/MessagePlatform.Notifications.sln
+              -c $(buildConfiguration)
+              --no-build
+              --logger trx
+              --collect:"XPlat Code Coverage"
+            displayName: 'Test'
+
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '**/*.trx'
+
+          - script: |
+              az bicep build --file infra/main.bicep --stdout > /dev/null
+            displayName: 'Compile Bicep'
+
+          - script: >
+              dotnet publish src/MessagePlatform.Notifications.Functions
+              -c $(buildConfiguration)
+              -o $(Build.ArtifactStagingDirectory)/functions
+            displayName: 'Publish function app'
+
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: drop
+
+          - publish: infra
+            artifact: infra
+
+  - stage: DeployDev
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - deployment: Dev
+        pool:
+          vmImage: $(vmImage)
+        environment: 'message-platform-dev'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureResourceManagerTemplateDeployment@3
+                  inputs:
+                    deploymentScope: 'Resource Group'
+                    azureResourceManagerConnection: 'msgplat-dev'
+                    resourceGroupName: 'rg-msgplat-dev'
+                    location: 'canadacentral'
+                    csmFile: '$(Pipeline.Workspace)/infra/main.bicep'
+                    csmParametersFile: '$(Pipeline.Workspace)/infra/parameters/dev.parameters.json'
+                    deploymentMode: 'Incremental'
+
+                - task: AzureFunctionApp@1
+                  inputs:
+                    azureSubscription: 'msgplat-dev'
+                    appType: 'functionAppLinux'
+                    appName: 'msgplat-dev-fn'
+                    package: '$(Pipeline.Workspace)/drop/functions'
