@@ -1,4 +1,8 @@
-# Build, test, then deploy dev automatically.
+# Build, test, then deploy dev automatically and prod behind an approval.
+#
+# The what-if step on production is the important one. Bicep is declarative
+# and a template change can quietly propose deleting a database; what-if puts
+# that in front of a human before the approval gate rather than after.
 
 trigger:
   branches:
@@ -89,3 +93,52 @@ stages:
                     appType: 'functionAppLinux'
                     appName: 'msgplat-dev-fn'
                     package: '$(Pipeline.Workspace)/drop/functions'
+
+  - stage: DeployProd
+    dependsOn: DeployDev
+    condition: succeeded()
+    jobs:
+      - job: WhatIf
+        pool:
+          vmImage: $(vmImage)
+        steps:
+          - task: AzureCLI@2
+            displayName: 'What-if against production'
+            inputs:
+              azureSubscription: 'msgplat-prod'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: >
+                az deployment group what-if
+                --resource-group rg-msgplat-prod
+                --template-file $(Pipeline.Workspace)/infra/main.bicep
+                --parameters @$(Pipeline.Workspace)/infra/parameters/prod.parameters.json
+
+      - deployment: Prod
+        dependsOn: WhatIf
+        pool:
+          vmImage: $(vmImage)
+        # The environment carries the approval check. The what-if output is
+        # in the log above it, so whoever approves has actually seen the diff.
+        environment: 'message-platform-prod'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureResourceManagerTemplateDeployment@3
+                  inputs:
+                    deploymentScope: 'Resource Group'
+                    azureResourceManagerConnection: 'msgplat-prod'
+                    resourceGroupName: 'rg-msgplat-prod'
+                    location: 'canadacentral'
+                    csmFile: '$(Pipeline.Workspace)/infra/main.bicep'
+                    csmParametersFile: '$(Pipeline.Workspace)/infra/parameters/prod.parameters.json'
+                    deploymentMode: 'Incremental'
+
+                - task: AzureFunctionApp@1
+                  inputs:
+                    azureSubscription: 'msgplat-prod'
+                    appType: 'functionAppLinux'
+                    appName: 'msgplat-prod-fn'
+                    package: '$(Pipeline.Workspace)/drop/functions'
+                    deploymentMethod: 'zipDeploy'
