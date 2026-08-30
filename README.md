@@ -1,7 +1,14 @@
 # message-azure
 
 Azure side of the MessagePlatform: Bicep infrastructure and the notification
-function. Pairs with the MessagePlatform API and its web client.
+function. Pairs with [dotnet-showcase](https://github.com/yght/dotnet-showcase),
+which is the API, and [message-web](https://github.com/yght/message-web),
+which is the client.
+
+*Rebuild note. This is a cleaned-up version of work from 2021. Subscription
+ids, tenant details and resource names from the original are gone; the
+architecture, the RBAC model and the notification rules are the real ones. I'm
+happy to walk through the live setup.*
 
 ## The interesting problem
 
@@ -103,7 +110,8 @@ az bicep build --file infra/main.bicep --stdout > /dev/null
 All three pass clean. `--warnaserror` is in the pipeline too — a nullable
 warning ignored for six months is a null reference in production.
 
-Deploying needs the two service connections named in the pipeline.
+Deploying needs an Azure subscription and the two service connections named in
+the pipeline. Nothing here will deploy by accident.
 
 ## What I'd change
 
