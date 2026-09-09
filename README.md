@@ -10,6 +10,19 @@ ids, tenant details and resource names from the original are gone; the
 architecture, the RBAC model and the notification rules are the real ones. I'm
 happy to walk through the live setup.*
 
+## What I want to demonstrate
+
+I want to show how I express customer-facing notification rules as testable code and connect them to Azure infrastructure.
+
+- **Domain design:** explicit precedence for mute, presence, quiet hours and urgency.
+- **Azure architecture:** Bicep modules, managed identity and service-specific access roles.
+- **Asynchronous processing:** scheduled deferral and an idempotency-key contract for notification delivery.
+- **Customer experience:** respecting notification preferences while keeping important messages visible.
+
+**Start here:** [notification policy](src/MessagePlatform.Notifications.Core/NotificationPolicy.cs), [policy tests](src/MessagePlatform.Notifications.Tests/NotificationPolicyTests.cs), and [Bicep orchestration](infra/main.bicep).
+
+**Scope:** the policy, infrastructure definitions and function outline are available for review. Concrete recipient-store and notification-sender implementations and their runtime registration are not included. Passing an idempotency key expresses a contract; enforcing deduplication belongs in the sender implementation. This is not a complete deployed notification service.
+
 ## The interesting problem
 
 Deciding whether to interrupt somebody.
