@@ -145,3 +145,9 @@ days. Dev should probably differ here and doesn't.
 No integration test runs against real Azure. The policy is covered thoroughly
 and the bindings are not covered at all, which is the usual shape — and the
 usual place the bugs actually are.
+
+## Engineering practices
+
+[Contribution and verification guide](CONTRIBUTING.md) · [Review template](.github/pull_request_template.md)
+
+The CI gate covers the policy on .NET 8. It does not establish deployability of the historical Functions host, bindings, Bicep or omitted adapters.
